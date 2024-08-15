@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DBXPatchTool": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Workspace\\Freedom\\freedom_customize_tool\\node_modules\\electron\\dist\\resources\\custom_item.json   C:\\FreedomWoW\\Client\\files\\dbfilesclient C:\\Workspace\\DB2Edits\\PatchToolDebug"
+    }
+  }
+}
