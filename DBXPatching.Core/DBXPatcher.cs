@@ -147,7 +147,7 @@ namespace DBXPatching.Core
             } else
             {
                 AddEmptyRow(records!, instruction.RecordId);
-                row = records.Values.LastOrDefault();
+                row = records!.Values.LastOrDefault();
             }
 
             if (row == null)
@@ -163,7 +163,8 @@ namespace DBXPatching.Core
             {
                 row.ID = _referenceIds[instruction.RecordIdReference];
                 var idFieldName = row.GetDynamicMemberNames().First();
-                row[idFieldName] = ConvertHelper.ConvertValue(row.GetUnderlyingType(), idFieldName, _referenceIds[instruction.RecordIdReference]);
+
+                DBCDRowHelper.SetDBCRowColumn(row, idFieldName, _referenceIds[instruction.RecordIdReference]);
             }
 
             foreach(var generateId in instruction.GenerateIds)
@@ -292,11 +293,11 @@ namespace DBXPatching.Core
                                 }
                                 col.FallBackValue = convertedVal!;
                             }
-                            row[col.ColumnName] = ConvertHelper.ConvertValue(row.GetUnderlyingType(), col.ColumnName, col.FallBackValue);
+                            DBCDRowHelper.SetDBCRowColumn(row, col.ColumnName, col.FallBackValue);
                         }
                         else
                         {
-                            row[col.ColumnName] = ConvertHelper.ConvertValue(row.GetUnderlyingType(), col.ColumnName, _referenceIds[col.ReferenceId]);
+                            DBCDRowHelper.SetDBCRowColumn(row, col.ColumnName, _referenceIds[col.ReferenceId]);
                         }
                     }
                     else
@@ -310,7 +311,7 @@ namespace DBXPatching.Core
                             }
                             col.Value = convertedVal!;
                         }
-                        row[col.ColumnName] = ConvertHelper.ConvertValue(row.GetUnderlyingType(), col.ColumnName, col.Value);
+                        DBCDRowHelper.SetDBCRowColumn(row, col.ColumnName, col.Value!);
                     }
                 }
                 catch
@@ -423,7 +424,7 @@ namespace DBXPatching.Core
                 {
                     rowRecords.SetValue(Activator.CreateInstance(arrayField.FieldType.GetElementType()!)!.ToString(), i);
                 }
-                row[arrayField.Name] = ConvertHelper.ConvertArray(arrayField.FieldType, count, rowRecords);
+                row[arrayField.Name] = DBCDRowHelper.ConvertArray(arrayField.FieldType, count, rowRecords);
             }
 
             // String Fields need to be initialized to empty string rather than null;
