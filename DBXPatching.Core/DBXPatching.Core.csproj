@@ -8,6 +8,6 @@
 
 
 	<ItemGroup>
-		<PackageReference Include="DBCD" Version="2.0.0" />
+		<PackageReference Include="DBCD" Version="2.0.1" />
 	</ItemGroup>
 </Project>
