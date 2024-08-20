@@ -1,4 +1,5 @@
 ﻿using DBCD;
+using DBCD.IO;
 using DBCD.Providers;
 using System.Text.Json;
 
@@ -146,8 +147,11 @@ namespace DBXPatching.Core
                 row = records[instruction.RecordId.Value];
             } else
             {
-                AddEmptyRow(records!, instruction.RecordId);
-                row = records!.Values.LastOrDefault();
+                var id = instruction.RecordId ?? (records!.Count > 0 ? records!.Keys.Max() : 1);
+                row = records!.ConstructRow(id);
+                row[row.GetDynamicMemberNames().First()] = id;
+                row.ID = id;
+                records!.Add(id, row);
             }
 
             if (row == null)
@@ -364,14 +368,20 @@ namespace DBXPatching.Core
 
         public DBXPatchingOperationResult ConvertJsonToFieldType(JsonElement element, string fileName, string field, out object? resultValue)
         {
-            var underlyingType = openedFiles[fileName].Values.First().GetUnderlyingType();
-            var fieldInfo = underlyingType.GetField(field);
-            while (fieldInfo == null && field.Length > 0)
+            try
             {
-                field = field.Remove(field.Length - 1);
-                fieldInfo = underlyingType.GetField(field);
-            }
-            if (fieldInfo == null)
+                var resultType = DBCDRowHelper.GetFieldType(openedFiles[fileName].ConstructRow(0), field);
+                resultValue = element.Deserialize(resultType);
+                if (resultValue == null)
+                {
+                    return new DBXPatchingOperationResult()
+                    {
+                        ResultCode = PatchingResultCode.ERROR_INVALID_VALUE_FOR_FIELD,
+                        Messages = [$"Found instruction without with invalid value '{element}' for file '{fileName}'."]
+                    };
+                }
+                return DBXPatchingOperationResult.Ok;
+            } catch
             {
                 resultValue = null;
                 return new DBXPatchingOperationResult()
@@ -380,54 +390,6 @@ namespace DBXPatching.Core
                     Messages = [$"Found instruction with invalid field reference '{field}' for file '{fileName}'."]
                 };
             }
-            var resultType = fieldInfo.FieldType;
-            if (resultType.IsArray)
-            {
-                resultType = resultType.GetElementType()!;
-            }
-            resultValue = element.Deserialize(resultType);
-            if (resultValue == null)
-            {
-                return new DBXPatchingOperationResult()
-                {
-                    ResultCode = PatchingResultCode.ERROR_INVALID_VALUE_FOR_FIELD,
-                    Messages = [$"Found instruction without with invalid value '{element}' for file '{fileName}'."]
-                };
-            }
-            return DBXPatchingOperationResult.Ok;
-        }
-
-
-        private void AddEmptyRow(IDBCDStorage storage, int? id = null)
-        {
-            // Initialization code
-            var lastItem = storage.Values.Last();
-            var row = storage.ConstructRow(id ?? storage.Values.Max(x => x.ID) + 1);
-            var fieldNames = row.GetDynamicMemberNames();
-
-            var underlyingType = storage.GetType().GenericTypeArguments.First();
-            var fields = underlyingType.GetFields();
-            // Array Fields need to be initialized to fill their length
-            var arrayFields = fields.Where(x => x.FieldType.IsArray);
-            foreach (var arrayField in arrayFields)
-            {
-
-                var count = ((Array)lastItem[arrayField.Name]).Length;
-                var rowRecords = new string[count];
-                for (var i = 0; i < count; i++)
-                {
-                    rowRecords.SetValue(Activator.CreateInstance(arrayField.FieldType.GetElementType()!)!.ToString(), i);
-                }
-                row[arrayField.Name] = DBCDRowHelper.ConvertArray(arrayField.FieldType, count, rowRecords);
-            }
-
-            // String Fields need to be initialized to empty string rather than null;
-            var stringFields = fields.Where(x => x.FieldType == typeof(string));
-            foreach (var stringField in stringFields)
-            {
-                row[stringField.Name] = string.Empty;
-            }
-            storage.Add(row.ID, row);
         }
     }
 }
