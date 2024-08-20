@@ -230,38 +230,28 @@ namespace DBXPatching.Core
             var result = OpenDb(instruction.Filename, out var records);
             if (result.ResultCode != PatchingResultCode.OK) { return result; }
             DBCDRow? record = null;
-            try
+
+            if (!string.IsNullOrEmpty(instruction.Field))
             {
-                if (string.IsNullOrEmpty(instruction.Field))
+                foreach (var row in records!.Values)
                 {
-                    record = records![instruction.RecordId];
-                } 
-                else
-                {
-                    foreach (var row in records!.Values)
+                    if (row[instruction.Field].Equals(instruction.RecordId))
                     {
-                        if (row[instruction.Field].Equals(instruction.RecordId))
-                        {
-                            record = row;
-                            break;
-                        }
+                        record = row;
+                        break;
                     }
                 }
-                if (record == null)
-                {
-                    return new DBXPatchingOperationResult()
-                    {
-                        ResultCode = PatchingResultCode.ERROR_UPDATE_RECORD_ID_NOT_FOUND,
-                        Messages = [$"Unable to find record with id: '{instruction.RecordId} for column '{instruction.Field}' in file: '{instruction.Filename}'."]
-                    };
-                }
-            } 
-            catch
+            }
+            if (string.IsNullOrEmpty(instruction.Field) && records!.ContainsKey(instruction.RecordId))
+            {
+                record = records![instruction.RecordId];
+            }
+            if (record == null)
             {
                 return new DBXPatchingOperationResult()
                 {
                     ResultCode = PatchingResultCode.ERROR_UPDATE_RECORD_ID_NOT_FOUND,
-                    Messages = [$"Unable to find record with id: '{instruction.RecordId} in file: '{instruction.Filename}'."]
+                    Messages = [$"Unable to find record with id: '{instruction.RecordId}{(string.IsNullOrEmpty(instruction.Field) ? "" : $" for column: {instruction.Field}")}' in file: '{instruction.Filename}'."]
                 };
             }
 
