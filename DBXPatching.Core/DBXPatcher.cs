@@ -163,14 +163,6 @@ namespace DBXPatching.Core
                 };
             }
 
-            if (!string.IsNullOrEmpty(instruction.RecordIdReference))
-            {
-                row.ID = _referenceIds[instruction.RecordIdReference];
-                var idFieldName = row.GetDynamicMemberNames().First();
-
-                DBCDRowHelper.SetDBCRowColumn(row, idFieldName, _referenceIds[instruction.RecordIdReference]);
-            }
-
             foreach(var generateId in instruction.GenerateIds)
             {
                 if (string.IsNullOrEmpty(generateId.Name))
@@ -209,6 +201,16 @@ namespace DBXPatching.Core
                     }
                 }
             }
+
+            if (!string.IsNullOrEmpty(instruction.RecordIdReference))
+            {
+                records.Remove(row.ID);
+                row.ID = _referenceIds[instruction.RecordIdReference];
+                var idFieldName = row.GetDynamicMemberNames().First();
+                DBCDRowHelper.SetDBCRowColumn(row, idFieldName, _referenceIds[instruction.RecordIdReference]);
+                records.Add(row.ID, row);
+            }
+
 
             var updateResult = SetColumnDataForRecord(row, instruction.Filename, instruction.Record);
             if (updateResult.ResultCode != PatchingResultCode.OK) {
