@@ -229,7 +229,8 @@ namespace DBXPatching.Core
                 if (string.IsNullOrEmpty(instruction.Field))
                 {
                     record = records![instruction.RecordId];
-                } else
+                } 
+                else
                 {
                     foreach (var row in records!.Values)
                     {
@@ -239,14 +240,14 @@ namespace DBXPatching.Core
                             break;
                         }
                     }
-                    if (record == null)
+                }
+                if (record == null)
+                {
+                    return new DBXPatchingOperationResult()
                     {
-                        return new DBXPatchingOperationResult()
-                        {
-                            ResultCode = PatchingResultCode.ERROR_UPDATE_RECORD_ID_NOT_FOUND,
-                            Messages = [$"Unable to find record with id: '{instruction.RecordId} for column '{instruction.Field}' in file: '{instruction.Filename}'."]
-                        };
-                    }
+                        ResultCode = PatchingResultCode.ERROR_UPDATE_RECORD_ID_NOT_FOUND,
+                        Messages = [$"Unable to find record with id: '{instruction.RecordId} for column '{instruction.Field}' in file: '{instruction.Filename}'."]
+                    };
                 }
             } 
             catch
@@ -271,46 +272,38 @@ namespace DBXPatching.Core
             {
                 try
                 {
+                    if (!string.IsNullOrEmpty(col.ReferenceId) && _referenceIds.ContainsKey(col.ReferenceId))
+                    {
+                        DBCDRowHelper.SetDBCRowColumn(row, col.ColumnName, _referenceIds[col.ReferenceId]);
+                        continue;
+                    }
+                    if (!string.IsNullOrEmpty(col.ReferenceId) && col.FallBackValue is JsonElement element)
+                    {
+                        var convertResult = ConvertJsonToFieldType(element, fileName, col.ColumnName, out var convertedVal);
+                        if (convertResult.ResultCode != PatchingResultCode.OK)
+                        {
+                            return convertResult;
+                        }
+                        col.FallBackValue = convertedVal!;
+                        DBCDRowHelper.SetDBCRowColumn(row, col.ColumnName, col.FallBackValue);
+                        continue;
+                    }
                     if (!string.IsNullOrEmpty(col.ReferenceId))
                     {
-                        if (!_referenceIds.ContainsKey(col.ReferenceId))
+                        return new DBXPatchingOperationResult()
                         {
-                            if (col.FallBackValue == null)
-                            {
-                                return new DBXPatchingOperationResult()
-                                {
-                                    ResultCode = PatchingResultCode.ERROR_REFERENCE_NOT_FOUND,
-                                    Messages = [$"Unable to find referenced instruction with name '{col.ReferenceId}'"]
-                                };
-                            }
-
-                            if (col.FallBackValue is JsonElement element)
-                            {
-                                var convertResult = ConvertJsonToFieldType(element, fileName, col.ColumnName, out var convertedVal);
-                                if (convertResult.ResultCode != PatchingResultCode.OK)
-                                {
-                                    return convertResult;
-                                }
-                                col.FallBackValue = convertedVal!;
-                            }
-                            DBCDRowHelper.SetDBCRowColumn(row, col.ColumnName, col.FallBackValue);
-                        }
-                        else
-                        {
-                            DBCDRowHelper.SetDBCRowColumn(row, col.ColumnName, _referenceIds[col.ReferenceId]);
-                        }
+                            ResultCode = PatchingResultCode.ERROR_REFERENCE_NOT_FOUND,
+                            Messages = [$"Unable to find referenced instruction with name '{col.ReferenceId}'"]
+                        };
                     }
-                    else
+                    if (col.Value is JsonElement valueElement)
                     {
-                        if (col.Value is JsonElement element)
+                        var convertResult = ConvertJsonToFieldType(valueElement, fileName, col.ColumnName, out var convertedVal);
+                        if (convertResult.ResultCode != PatchingResultCode.OK)
                         {
-                            var convertResult = ConvertJsonToFieldType(element, fileName, col.ColumnName, out var convertedVal);
-                            if (convertResult.ResultCode != PatchingResultCode.OK)
-                            {
-                                return convertResult;
-                            }
-                            col.Value = convertedVal!;
+                            return convertResult;
                         }
+                        col.Value = convertedVal!;
                         DBCDRowHelper.SetDBCRowColumn(row, col.ColumnName, col.Value!);
                     }
                 }
@@ -354,16 +347,17 @@ namespace DBXPatching.Core
         {
             foreach (var reference in instructions)
             {
-                if (!string.IsNullOrEmpty(reference.Name))
+                if (string.IsNullOrEmpty(reference.Name))
                 {
-                    if (string.IsNullOrEmpty(reference.Field))
-                    {
-                        _referenceIds[reference.Name] = row.ID;
-                    }
-                    else
-                    {
-                        _referenceIds[reference.Name] = Convert.ToInt32(row[reference.Field]);
-                    }
+                    continue;
+                }
+                if (string.IsNullOrEmpty(reference.Field))
+                {
+                    _referenceIds[reference.Name] = row.ID;
+                }
+                else
+                {
+                    _referenceIds[reference.Name] = Convert.ToInt32(row[reference.Field]);
                 }
             }
         }
